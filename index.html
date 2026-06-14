@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1f1711" />
+    <title>暗棋大乱斗</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="command-rail" aria-label="功能区">
+        <div class="seal-title">
+          <span>暗棋</span>
+          <strong>大乱斗</strong>
+        </div>
+        <div class="controls">
+          <button id="restartBtn" type="button">重新开局</button>
+          <button id="humanModeBtn" class="mode-button active" type="button">双人模式</button>
+          <button id="aiModeBtn" class="mode-button" type="button">人机模式</button>
+          <button id="rulesBtn" type="button">游戏规则</button>
+          <label>
+            <input id="soundToggle" type="checkbox" checked />
+            音效
+          </label>
+          <label>
+            <input id="vibrationToggle" type="checkbox" checked />
+            震动
+          </label>
+          <label>
+            <input id="reducedMotionToggle" type="checkbox" />
+            减少动画
+          </label>
+        </div>
+      </aside>
+
+      <section class="play-area">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">中国象棋隐藏身份玩法</p>
+            <h1>暗棋大乱斗</h1>
+          </div>
+          <div class="info-strip" aria-live="polite">
+            <div class="info-card">
+              <span>当前回合</span>
+              <strong id="turnText">红方行动</strong>
+            </div>
+            <div class="info-card">
+              <span>当前模式</span>
+              <strong id="modeText">双人模式</strong>
+            </div>
+            <div class="info-card">
+              <span>当前状态</span>
+              <strong id="stateText">普通</strong>
+            </div>
+          </div>
+        </header>
+
+        <section class="board-section">
+          <div id="statusPanel" class="status-panel" aria-live="polite">
+            正在加载棋局脚本。如果长时间停留在这里，请使用本地静态服务器打开项目。
+          </div>
+          <div class="board-stage">
+            <div id="board" class="board-shell" aria-label="中国象棋棋盘"></div>
+          </div>
+          <div id="selectionInfo" class="selection-info" aria-live="polite">
+            棋盘和棋子会在脚本加载后显示。
+          </div>
+        </section>
+
+        <section class="bottom-dock" aria-label="辅助信息区">
+          <div class="captured-panel">
+            <h2>黑方被吃</h2>
+            <div id="blackCaptured" class="captured-list"></div>
+          </div>
+          <div class="assist-actions">
+            <button id="undoBtn" type="button" disabled>悔棋</button>
+            <button id="backBtn" type="button" disabled>返回</button>
+          </div>
+          <div class="captured-panel">
+            <h2>红方被吃</h2>
+            <div id="redCaptured" class="captured-list"></div>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <dialog id="rulesDialog" class="rules-dialog">
+      <h2>基础规则</h2>
+      <p>除帅、将和四枚士外，其余 26 枚棋子随机隐藏在标准开局棋位。暗棋首次行动前按所在位置的临时身份和阵营行动，首次合法移动或吃子后立即翻面。</p>
+      <p>翻面后棋子归真实阵营控制，之后按真实身份行动。未翻面的暗棋被吃时直接移除，不公开真实身份。</p>
+      <p>如果暗棋翻出敌方棋子并只由这枚新翻棋子攻击己方将帅，会触发“潜在威胁”：该攻击暂时冻结，对方先走一个受限制回合，随后己方获得调整回合。</p>
+      <p>胜利只以将或帅被合法吃掉为准，不因将死或无棋可走直接判胜负。</p>
+      <form method="dialog">
+        <button type="submit">知道了</button>
+      </form>
+    </dialog>
+
+    <dialog id="victoryDialog" class="victory-dialog">
+      <h2 id="victoryTitle">红方获胜</h2>
+      <p id="victoryText">将帅已被吃掉。</p>
+      <form method="dialog">
+        <button id="victoryUndoBtn" type="button" disabled>悔棋</button>
+        <button id="victoryRestartBtn" type="button">重新开局</button>
+      </form>
+    </dialog>
+
+    <div id="toast" class="toast" aria-live="polite"></div>
+
+    <script type="module" src="js/main.js"></script>
+    <script>
+      window.setTimeout(function () {
+        if (document.body.dataset.appReady === "true") {
+          return;
+        }
+
+        var statusPanel = document.getElementById("statusPanel");
+        var board = document.getElementById("board");
+        var selectionInfo = document.getElementById("selectionInfo");
+
+        if (statusPanel) {
+          statusPanel.innerHTML =
+            "<strong>棋局脚本没有启动</strong><br>请不要直接双击 index.html 打开。用 VS Code Live Server，或在项目根目录运行静态服务器后访问页面。";
+        }
+
+        if (board) {
+          board.classList.add("board-load-failed");
+          board.innerHTML = '<div class="load-failed">等待脚本加载</div>';
+        }
+
+        if (selectionInfo) {
+          selectionInfo.textContent =
+            "如果你当前地址栏以 file:// 开头，浏览器会拦截 ES Module 文件导入。";
+        }
+      }, 1200);
+    </script>
+  </body>
+</html>

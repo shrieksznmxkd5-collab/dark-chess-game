@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>暗棋大乱斗规则测试</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #17110d;
+        color: #f2e3c8;
+        font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+      }
+      main {
+        width: min(900px, 100%);
+        margin: 0 auto;
+      }
+      .test {
+        margin: 8px 0;
+        padding: 10px 12px;
+        border: 1px solid rgba(213, 168, 91, 0.22);
+        border-radius: 8px;
+        background: rgba(45, 31, 21, 0.72);
+      }
+      .pass {
+        color: #a8df9a;
+      }
+      .fail {
+        color: #f2a08d;
+      }
+      pre {
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>暗棋大乱斗规则测试</h1>
+      <p id="summary">正在运行...</p>
+      <section id="results"></section>
+    </main>
+    <script type="module">
+      import { runRulesTests } from "./rules-test-suite.js";
+
+      const summary = document.getElementById("summary");
+      const results = document.getElementById("results");
+      const report = runRulesTests();
+
+      summary.textContent = `通过 ${report.passed} / ${report.total} 项`;
+      summary.className = report.failed === 0 ? "pass" : "fail";
+
+      results.innerHTML = report.results
+        .map(
+          (result, index) => `
+            <article class="test ${result.ok ? "pass" : "fail"}">
+              <strong>${index + 1}. ${result.ok ? "通过" : "失败"}：${result.name}</strong>
+              ${result.ok ? "" : `<pre>${result.error}</pre>`}
+            </article>
+          `
+        )
+        .join("");
+    </script>
+  </body>
+</html>
