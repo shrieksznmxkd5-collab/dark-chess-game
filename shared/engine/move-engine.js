@@ -113,7 +113,7 @@ function validateRestrictedTurn(workState, moverCamp, target) {
   }
 
   if (!isCampSafe(workState.pieces, moverCamp)) {
-    return { ok: false, reason: "该行动会让自己的将帅受攻击" };
+    return { ok: false, reason: "该行动会让自己的将帅受到攻击" };
   }
 
   const protectedAttackers = getAttackersToGeneral(
@@ -184,7 +184,7 @@ function finishNormalTurn(sourceState, workState, movedPiece, moverCamp, context
     );
 
     if (!delayedThreat) {
-      return { ok: false, reason: "该行动会让自己的将帅受攻击" };
+      return { ok: false, reason: "该行动会让自己的将帅受到攻击" };
     }
 
     workState.delayedThreat = delayedThreat;
@@ -258,7 +258,7 @@ export function evaluateMove(sourceState, pieceId, toRow, toCol) {
       !(phase === PHASES.NORMAL && context.wasDarkFirst) &&
       phase !== PHASES.ADJUSTMENT
     ) {
-      return { ok: false, reason: "该行动会让自己的将帅受攻击" };
+      return { ok: false, reason: "该行动会让自己的将帅受到攻击" };
     }
   }
 
@@ -267,9 +267,11 @@ export function evaluateMove(sourceState, pieceId, toRow, toCol) {
 
   let phaseResult;
   const logicPhase = getLogicPhase(sourceState);
-  if (capturedGeneral) {
+  if (logicPhase === PHASES.RESTRICTED) {
+    phaseResult = finishRestrictedTurn(workState, moverCamp, context);
+  } else if (capturedGeneral) {
     if (!isCampSafe(workState.pieces, moverCamp)) {
-      return { ok: false, reason: "该行动会让自己的将帅受攻击" };
+      return { ok: false, reason: "该行动会让自己的将帅受到攻击" };
     }
     workState.gameOver = true;
     workState.winner = moverCamp;
@@ -277,8 +279,6 @@ export function evaluateMove(sourceState, pieceId, toRow, toCol) {
     workState.phase = PHASES.GAME_OVER;
     workState.delayedThreat = null;
     phaseResult = { ok: true };
-  } else if (logicPhase === PHASES.RESTRICTED) {
-    phaseResult = finishRestrictedTurn(workState, moverCamp, context);
   } else if (logicPhase === PHASES.ADJUSTMENT) {
     phaseResult = finishAdjustmentTurn(workState);
   } else {
@@ -437,4 +437,3 @@ export function applyMove(sourceState, move) {
 
   return result;
 }
-

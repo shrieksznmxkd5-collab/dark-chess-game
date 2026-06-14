@@ -4,20 +4,56 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#1f1711" />
-    <title>暗棋大乱斗</title>
+    <title>卧底象棋</title>
     <link rel="stylesheet" href="css/style.css" />
   </head>
   <body>
-    <main class="app-shell">
-      <aside class="command-rail" aria-label="功能区">
+    <main id="homeView" class="home-view" aria-label="卧底象棋首页">
+      <section class="home-panel">
+        <p class="home-kicker">中国象棋隐藏身份玩法</p>
+        <h1>卧底象棋</h1>
+        <p class="home-subtitle">身份未明，落子之后方见真章</p>
+        <div class="home-actions" aria-label="模式选择">
+          <button id="homeAiBtn" class="home-mode-card primary" type="button">
+            <span>人机模式</span>
+            <small>与AI进行一场卧底象棋对局</small>
+          </button>
+          <button id="homeLocalBtn" class="home-mode-card" type="button">
+            <span>双人模式</span>
+            <small>同一设备红黑双方轮流操作</small>
+          </button>
+          <button id="homeCreateRoomBtn" class="home-mode-card" type="button">
+            <span>创建好友房</span>
+            <small>生成6位房间码，邀请朋友加入</small>
+          </button>
+          <button id="homeJoinRoomBtn" class="home-mode-card" type="button">
+            <span>加入房间</span>
+            <small>输入房间码进入好友房大厅</small>
+          </button>
+        </div>
+        <div class="home-tools" aria-label="首页设置">
+          <button id="homeRulesBtn" type="button">游戏规则</button>
+          <label>
+            <input id="homeSoundToggle" type="checkbox" checked />
+            音效
+          </label>
+          <label>
+            <input id="homeVibrationToggle" type="checkbox" checked />
+            震动
+          </label>
+        </div>
+      </section>
+    </main>
+
+    <main id="gameView" class="app-shell game-view" aria-label="卧底象棋棋盘页" hidden>
+      <aside class="command-rail" aria-label="棋局功能区">
         <div class="seal-title">
-          <span>暗棋</span>
-          <strong>大乱斗</strong>
+          <span>卧底</span>
+          <strong>象棋</strong>
         </div>
         <div class="controls">
+          <button id="backHomeBtn" type="button">返回首页</button>
           <button id="restartBtn" type="button">重新开局</button>
-          <button id="humanModeBtn" class="mode-button active" type="button">双人模式</button>
-          <button id="aiModeBtn" class="mode-button" type="button">人机模式</button>
           <button id="rulesBtn" type="button">游戏规则</button>
           <label>
             <input id="soundToggle" type="checkbox" checked />
@@ -27,10 +63,6 @@
             <input id="vibrationToggle" type="checkbox" checked />
             震动
           </label>
-          <label>
-            <input id="reducedMotionToggle" type="checkbox" />
-            减少动画
-          </label>
         </div>
       </aside>
 
@@ -38,7 +70,7 @@
         <header class="topbar">
           <div>
             <p class="eyebrow">中国象棋隐藏身份玩法</p>
-            <h1>暗棋大乱斗</h1>
+            <h1>卧底象棋</h1>
           </div>
           <div class="info-strip" aria-live="polite">
             <div class="info-card">
@@ -75,7 +107,7 @@
           </div>
           <div class="assist-actions">
             <button id="undoBtn" type="button" disabled>悔棋</button>
-            <button id="backBtn" type="button" disabled>返回</button>
+            <button id="backBtn" type="button">返回首页</button>
           </div>
           <div class="captured-panel">
             <h2>红方被吃</h2>
@@ -86,19 +118,19 @@
     </main>
 
     <dialog id="rulesDialog" class="rules-dialog">
-      <h2>基础规则</h2>
-      <p>除帅、将和四枚士外，其余 26 枚棋子随机隐藏在标准开局棋位。暗棋首次行动前按所在位置的临时身份和阵营行动，首次合法移动或吃子后立即翻面。</p>
-      <p>翻面后棋子归真实阵营控制，之后按真实身份行动。未翻面的暗棋被吃时直接移除，不公开真实身份。</p>
-      <p>如果暗棋翻出敌方棋子并只由这枚新翻棋子攻击己方将帅，会触发“潜在威胁”：该攻击暂时冻结，对方先走一个受限制回合，随后己方获得调整回合。</p>
-      <p>胜利只以将或帅被合法吃掉为准，不因将死或无棋可走直接判胜负。</p>
+      <h2>《卧底象棋》基础规则</h2>
+      <p>除帅、将和四枚士外，其余 26 枚棋子随机隐藏在标准开局棋位。暗棋首次行动前按照所在位置的临时身份和阵营行动，首次合法移动或吃子后立即翻面。</p>
+      <p>翻面后棋子归真实阵营控制，之后按照真实身份行动。未翻面的暗棋被吃时直接移除，不公开真实身份。</p>
+      <p>如果暗棋翻出敌方棋子，并且仅由这枚新翻棋子攻击己方将帅，会触发“潜在威胁”：该攻击暂时冻结，对方先走一个受限制回合，随后己方获得调整回合。</p>
+      <p>胜利只以将或帅被合法吃掉为准，不因将死或无棋可走直接判负。</p>
       <form method="dialog">
         <button type="submit">知道了</button>
       </form>
     </dialog>
 
     <dialog id="victoryDialog" class="victory-dialog">
-      <h2 id="victoryTitle">红方获胜</h2>
-      <p id="victoryText">将帅已被吃掉。</p>
+      <h2 id="victoryTitle">卧底象棋：红方获胜</h2>
+      <p id="victoryText">将或帅已被吃掉。</p>
       <form method="dialog">
         <button id="victoryUndoBtn" type="button" disabled>悔棋</button>
         <button id="victoryRestartBtn" type="button">重新开局</button>
@@ -120,7 +152,7 @@
 
         if (statusPanel) {
           statusPanel.innerHTML =
-            "<strong>棋局脚本没有启动</strong><br>请不要直接双击 index.html 打开。用 VS Code Live Server，或在项目根目录运行静态服务器后访问页面。";
+            "<strong>棋局脚本没有启动</strong><br>请不要直接双击 index.html 打开。请使用 VS Code Live Server，或在项目根目录运行静态服务器后访问页面。";
         }
 
         if (board) {
@@ -130,7 +162,7 @@
 
         if (selectionInfo) {
           selectionInfo.textContent =
-            "如果你当前地址栏以 file:// 开头，浏览器会拦截 ES Module 文件导入。";
+            "如果当前地址栏以 file:// 开头，浏览器会拦截 ES Module 文件导入。";
         }
       }, 1200);
     </script>

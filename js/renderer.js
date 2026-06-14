@@ -1,4 +1,4 @@
-import { CAMP_NAMES, GAME_MODES, PHASES, TYPE_NAMES, getPieceLabel } from "./config.js";
+import { APP_VIEWS, CAMP_NAMES, GAME_MODES, PHASES, TYPE_NAMES, getPieceLabel } from "./config.js";
 import { getLogicPhase } from "./delayed-threat.js";
 import { findGeneral, getAttackersToGeneral, isGeneralUnderAttack } from "./attacks.js";
 import { getActiveCamp } from "./rules.js";
@@ -107,7 +107,7 @@ function renderCheckEffects(state, boardInner) {
   }
 
   const layer = document.createElement("div");
-  layer.className = `check-effect-layer ${state.settings?.reducedMotion ? "is-static" : ""}`;
+  layer.className = "check-effect-layer";
   layer.setAttribute("aria-hidden", "true");
 
   getAttackersToGeneral(state.pieces, state.currentCamp).forEach((attacker) => {
@@ -132,7 +132,7 @@ function renderFinalStrikeEffect(state, boardInner) {
 
   const point = state.lastMove?.to ?? { row: 4.5, col: 4 };
   const layer = document.createElement("div");
-  layer.className = `final-strike-layer ${state.settings?.reducedMotion ? "is-static" : ""}`;
+  layer.className = "final-strike-layer";
   layer.setAttribute("aria-hidden", "true");
 
   const burst = document.createElement("span");
@@ -156,7 +156,6 @@ function renderBoard(state) {
   board.classList.remove("board-load-failed");
   board.innerHTML = boardSvg;
   const boardInner = board.querySelector(".board-inner");
-  boardInner.classList.toggle("reduced-motion", Boolean(state.settings?.reducedMotion));
   renderCheckEffects(state, boardInner);
   renderFinalStrikeEffect(state, boardInner);
 
@@ -280,7 +279,7 @@ function renderStatus(state) {
   const modeText = getElement("modeText");
   const stateText = getElement("stateText");
   if (modeText) {
-    modeText.textContent = state.mode === "ai" ? "人机模式" : "双人模式";
+    modeText.textContent = state.mode === GAME_MODES.AI ? "人机模式" : "双人模式";
   }
   if (stateText) {
     stateText.textContent = getStateLabel(state);
@@ -319,8 +318,8 @@ function renderVictory(state) {
   }
 
   if (state.gameOver && !dialog.open) {
-    getElement("victoryTitle").textContent = `${CAMP_NAMES[state.winner]}获胜`;
-    getElement("victoryText").textContent = "将或帅被合法吃掉，游戏结束。";
+    getElement("victoryTitle").textContent = `卧底象棋：${CAMP_NAMES[state.winner]}获胜`;
+    getElement("victoryText").textContent = "将或帅被合法吃掉，本局结束。";
     const victoryKey = `${state.winner}-${state.lastMove?.pieceId ?? "move"}-${state.moveCount}`;
     if (queuedVictoryKey !== victoryKey) {
       window.clearTimeout(victoryDialogTimer);
@@ -329,7 +328,7 @@ function renderVictory(state) {
         if (state.gameOver && !dialog.open) {
           dialog.showModal();
         }
-      }, state.settings?.reducedMotion ? 80 : 860);
+      }, 860);
     }
   }
 
@@ -370,7 +369,42 @@ function renderUndoControls(state) {
   });
 }
 
+function setChecked(id, checked) {
+  const element = getElement(id);
+  if (element) {
+    element.checked = checked;
+  }
+}
+
+function renderAppView(state) {
+  const appView = state.appView ?? APP_VIEWS.HOME;
+  const isGameView = appView === APP_VIEWS.GAME;
+  const homeView = getElement("homeView");
+  const gameView = getElement("gameView");
+
+  document.body.dataset.view = appView;
+
+  if (homeView) {
+    homeView.hidden = isGameView;
+  }
+
+  if (gameView) {
+    gameView.hidden = !isGameView;
+  }
+
+  setChecked("homeSoundToggle", state.settings.sound);
+  setChecked("homeVibrationToggle", state.settings.vibration);
+  setChecked("soundToggle", state.settings.sound);
+  setChecked("vibrationToggle", state.settings.vibration);
+}
+
 export function renderGame(state) {
+  renderAppView(state);
+
+  if ((state.appView ?? APP_VIEWS.HOME) !== APP_VIEWS.GAME) {
+    return;
+  }
+
   renderStatus(state);
   renderBoard(state);
   renderCapturedList(state, "red");
@@ -378,15 +412,6 @@ export function renderGame(state) {
   renderSelectionInfo(state);
   renderVictory(state);
   renderUndoControls(state);
-  getElement("soundToggle").checked = state.settings.sound;
-  getElement("vibrationToggle").checked = state.settings.vibration;
-  getElement("reducedMotionToggle").checked = state.settings.reducedMotion;
-  const humanModeBtn = getElement("humanModeBtn");
-  const aiModeBtn = getElement("aiModeBtn");
-  if (humanModeBtn && aiModeBtn) {
-    humanModeBtn.classList.toggle("active", state.mode !== "ai");
-    aiModeBtn.classList.toggle("active", state.mode === "ai");
-  }
 }
 
 let toastTimer = null;

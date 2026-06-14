@@ -8,6 +8,10 @@ function getPieceElement(pieceId) {
   return document.querySelector(`[data-piece-id="${pieceId}"]`);
 }
 
+export function clearAnimationArtifacts() {
+  document.querySelectorAll(".trail-dot").forEach((element) => element.remove());
+}
+
 function pointToPercent(point) {
   return {
     x: (point.col / 8) * 100,
@@ -41,7 +45,7 @@ function createTrail(result) {
 }
 
 export async function playMoveFeedback(result, settings) {
-  if (!result?.ok || settings.reducedMotion) {
+  if (!result?.ok) {
     return;
   }
 
@@ -108,4 +112,3 @@ export async function playMoveFeedback(result, settings) {
 
   await Promise.allSettled(animations);
 }
-

@@ -1,5 +1,6 @@
 import { CAMPS, PIECE_TYPES } from "./config.js";
 import { FIXED_VISIBLE_POSITIONS, HIDDEN_START_SLOTS } from "./board.js";
+import { createControlledShuffle } from "./shuffle-strategy.js";
 
 function makeId(index) {
   return `piece-${String(index + 1).padStart(2, "0")}`;
@@ -45,7 +46,12 @@ export function createInitialPieces(random = Math.random) {
     pieces.push(createPieceFromPosition(position, pieces.length, { faceUp: true }));
   });
 
-  const shuffledDeck = shuffle(createRealHiddenDeck(), random);
+  const shuffledDeck = createControlledShuffle({
+    deck: createRealHiddenDeck(),
+    slots: HIDDEN_START_SLOTS,
+    random,
+    shuffle
+  });
   HIDDEN_START_SLOTS.forEach((slot, slotIndex) => {
     const real = shuffledDeck[slotIndex];
     pieces.push(
@@ -103,4 +109,3 @@ export function createCapturedRecord(piece, capturedBy) {
     initialCamp: piece.initialCamp
   };
 }
-

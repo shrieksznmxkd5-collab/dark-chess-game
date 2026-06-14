@@ -1,4 +1,4 @@
-import { CAMPS, DEFAULT_SETTINGS, GAME_MODES, PHASES } from "./config.js";
+import { APP_VIEWS, CAMPS, DEFAULT_SETTINGS, GAME_MODES, PHASES } from "./config.js";
 import {
   cloneState as cloneEngineState,
   createCustomEngineState,
@@ -9,6 +9,8 @@ function addUiState(engineState, options = {}) {
   return {
     ...engineState,
     mode: options.mode ?? GAME_MODES.HUMAN,
+    appView: options.appView ?? APP_VIEWS.HOME,
+    gameActive: options.gameActive ?? false,
     uiState: "idle",
     selectedPieceId: null,
     legalTargets: [],

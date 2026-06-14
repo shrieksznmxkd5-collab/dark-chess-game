@@ -1,13 +1,21 @@
 import { DEFAULT_SETTINGS } from "./config.js";
 
-const STORAGE_KEY = "dark-chess-settings";
+const STORAGE_KEY = "undercover-xiangqi-settings";
 let audioContext = null;
 let settings = { ...DEFAULT_SETTINGS };
+
+function normalizeSettings(value = {}) {
+  return {
+    sound: value.sound ?? DEFAULT_SETTINGS.sound,
+    vibration: value.vibration ?? DEFAULT_SETTINGS.vibration
+  };
+}
 
 export function loadSettings() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    settings = { ...DEFAULT_SETTINGS, ...(saved ?? {}) };
+    settings = normalizeSettings(saved ?? {});
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
   } catch {
     settings = { ...DEFAULT_SETTINGS };
   }
@@ -15,7 +23,7 @@ export function loadSettings() {
 }
 
 export function saveSettings(nextSettings) {
-  settings = { ...settings, ...nextSettings };
+  settings = normalizeSettings({ ...settings, ...nextSettings });
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
   } catch {
@@ -92,4 +100,3 @@ export function vibrate(type, overrideSettings = settings) {
 
   navigator.vibrate(patterns[type] ?? 10);
 }
-

@@ -7,7 +7,7 @@ export {
   opponentCamp
 } from "../shared/engine/config.js";
 
-import { CAMPS, PIECE_TYPES } from "../shared/engine/config.js";
+import { CAMPS } from "../shared/engine/config.js";
 
 export const CAMP_NAMES = {
   red: "红方",
@@ -17,7 +17,7 @@ export const CAMP_NAMES = {
 export const TYPE_NAMES = {
   general: "将帅",
   advisor: "士",
-  elephant: "象/相",
+  elephant: "象相",
   horse: "马",
   rook: "车",
   cannon: "炮",
@@ -46,8 +46,14 @@ export const PIECE_LABELS = {
 };
 
 export const GAME_MODES = {
-  HUMAN: "human",
+  LOCAL: "local",
+  HUMAN: "local",
   AI: "ai"
+};
+
+export const APP_VIEWS = {
+  HOME: "home",
+  GAME: "game"
 };
 
 export const HUMAN_CAMP = CAMPS.RED;
@@ -62,11 +68,9 @@ export const ANIMATION = {
 
 export const DEFAULT_SETTINGS = {
   sound: true,
-  vibration: true,
-  reducedMotion: false
+  vibration: true
 };
 
 export function getPieceLabel(type, camp) {
   return PIECE_LABELS[camp]?.[type] ?? "?";
 }
-

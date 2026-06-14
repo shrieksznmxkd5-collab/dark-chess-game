@@ -171,4 +171,3 @@ export function getAllTargetPoints() {
   }
   return points;
 }
-

@@ -1,7 +1,7 @@
-import { AI_CAMP, CAMPS, GAME_MODES } from "./config.js";
+import { AI_CAMP, APP_VIEWS, CAMPS, GAME_MODES } from "./config.js";
 import { chooseAiMove, getAiThinkDelay } from "./ai.js";
 import { cloneState, createGameState, replaceState } from "./game-state.js";
-import { playMoveFeedback } from "./animations.js";
+import { clearAnimationArtifacts, playMoveFeedback } from "./animations.js";
 import { loadSettings, playSound, saveSettings, vibrate } from "./audio.js";
 import {
   advancePastNoLegalMoves,
@@ -12,10 +12,17 @@ import { getActiveCamp } from "./rules.js";
 import { renderGame, showToast } from "./renderer.js";
 
 let aiTaskRunning = false;
+let aiTimerId = null;
+let aiTimerResolve = null;
 
-function wait(ms) {
+function waitForAi(ms) {
   return new Promise((resolve) => {
-    window.setTimeout(resolve, ms);
+    aiTimerResolve = resolve;
+    aiTimerId = window.setTimeout(() => {
+      aiTimerId = null;
+      aiTimerResolve = null;
+      resolve(true);
+    }, ms);
   });
 }
 
@@ -28,13 +35,39 @@ function findPieceById(state, pieceId) {
 }
 
 function isAiTurn(state) {
-  return state.mode === GAME_MODES.AI && state.currentCamp === AI_CAMP && !state.gameOver;
+  return (
+    state.appView === APP_VIEWS.GAME &&
+    state.gameActive &&
+    state.mode === GAME_MODES.AI &&
+    state.currentCamp === AI_CAMP &&
+    !state.gameOver
+  );
 }
 
 function clearSelection(state) {
   state.selectedPieceId = null;
   state.legalTargets = [];
   state.uiState = "idle";
+}
+
+export function stopAiTask(state) {
+  if (aiTimerId) {
+    window.clearTimeout(aiTimerId);
+    aiTimerId = null;
+  }
+
+  if (aiTimerResolve) {
+    aiTimerResolve(false);
+    aiTimerResolve = null;
+  }
+
+  aiTaskRunning = false;
+
+  if (state) {
+    state.inputLocked = false;
+    state.aiThinking = false;
+    clearSelection(state);
+  }
 }
 
 function canCreateAiUndoSnapshot(state) {
@@ -77,6 +110,13 @@ function commitPendingAiUndo(state) {
 function clearAiUndoCycle(state) {
   state.undoSnapshot = null;
   state.pendingUndoSnapshot = null;
+}
+
+function closeDialog(id) {
+  const dialog = document.getElementById(id);
+  if (dialog?.open) {
+    dialog.close();
+  }
 }
 
 function selectPiece(state, piece) {
@@ -174,7 +214,10 @@ async function runAiMove(state) {
   state.message = "黑方正在思考。";
   renderGame(state);
 
-  await wait(getAiThinkDelay());
+  const canContinue = await waitForAi(getAiThinkDelay());
+  if (!canContinue) {
+    return;
+  }
 
   if (!isAiTurn(state)) {
     state.inputLocked = false;
@@ -271,24 +314,61 @@ function handleBoardClick(state, event) {
   attemptSelectedMove(state, row, col);
 }
 
-function restart(state, mode = state.mode) {
+export function startGame(state, mode = GAME_MODES.LOCAL) {
+  stopAiTask(state);
   const settings = state.settings;
-  replaceState(state, createGameState({ settings, mode }));
+  replaceState(
+    state,
+    createGameState({
+      settings,
+      mode,
+      appView: APP_VIEWS.GAME,
+      gameActive: true
+    })
+  );
   renderGame(state);
   showToast(mode === GAME_MODES.AI ? "人机模式开始，玩家执红。" : "双人模式开始，红方先行。");
   queueAiMove(state);
 }
 
-function switchMode(state, mode) {
-  if (state.mode === mode) {
-    return;
+function restart(state, mode = state.mode) {
+  startGame(state, mode);
+}
+
+export function returnHome(state, { skipConfirm = false } = {}) {
+  const shouldConfirm =
+    !skipConfirm &&
+    state.appView === APP_VIEWS.GAME &&
+    state.gameActive &&
+    !state.gameOver;
+
+  if (shouldConfirm && !window.confirm("当前棋局尚未结束，确认返回首页吗？")) {
+    return false;
   }
-  restart(state, mode);
+
+  stopAiTask(state);
+  clearAnimationArtifacts();
+  closeDialog("victoryDialog");
+  closeDialog("rulesDialog");
+
+  const settings = state.settings;
+  const mode = state.mode ?? GAME_MODES.LOCAL;
+  replaceState(
+    state,
+    createGameState({
+      settings,
+      mode,
+      appView: APP_VIEWS.HOME,
+      gameActive: false
+    })
+  );
+  renderGame(state);
+  return true;
 }
 
 function undoAiTurn(state) {
   if (!canUseAiUndo(state)) {
-    showToast("当前没有可用悔棋。人机模式下需等 AI 落子后才能悔棋。");
+    showToast("当前没有可用悔棋。人机模式下需要等 AI 落子后才能悔棋。");
     return;
   }
 
@@ -312,6 +392,18 @@ function undoAiTurn(state) {
   showToast(`已悔棋，剩余 ${remaining} 次。`);
 }
 
+function bindSettingToggle(state, id, key) {
+  const element = document.getElementById(id);
+  if (!element) {
+    return;
+  }
+
+  element.addEventListener("change", (event) => {
+    state.settings = saveSettings({ [key]: event.target.checked });
+    renderGame(state);
+  });
+}
+
 export function bindInput(state) {
   state.settings = { ...state.settings, ...loadSettings() };
   renderGame(state);
@@ -321,9 +413,11 @@ export function bindInput(state) {
   });
 
   document.getElementById("restartBtn").addEventListener("click", () => restart(state));
+  document.getElementById("backHomeBtn").addEventListener("click", () => returnHome(state));
+  document.getElementById("backBtn").addEventListener("click", () => returnHome(state));
   document.getElementById("undoBtn").addEventListener("click", () => undoAiTurn(state));
   document.getElementById("victoryRestartBtn").addEventListener("click", () => {
-    document.getElementById("victoryDialog").close();
+    closeDialog("victoryDialog");
     restart(state);
   });
   document.getElementById("victoryUndoBtn").addEventListener("click", () => undoAiTurn(state));
@@ -331,25 +425,10 @@ export function bindInput(state) {
     document.getElementById("rulesDialog").showModal();
   });
 
-  document.getElementById("humanModeBtn").addEventListener("click", () => {
-    switchMode(state, GAME_MODES.HUMAN);
-  });
-  document.getElementById("aiModeBtn").addEventListener("click", () => {
-    switchMode(state, GAME_MODES.AI);
-  });
-
-  document.getElementById("soundToggle").addEventListener("change", (event) => {
-    state.settings = saveSettings({ sound: event.target.checked });
-    renderGame(state);
-  });
-  document.getElementById("vibrationToggle").addEventListener("change", (event) => {
-    state.settings = saveSettings({ vibration: event.target.checked });
-    renderGame(state);
-  });
-  document.getElementById("reducedMotionToggle").addEventListener("change", (event) => {
-    state.settings = saveSettings({ reducedMotion: event.target.checked });
-    renderGame(state);
-  });
+  bindSettingToggle(state, "soundToggle", "sound");
+  bindSettingToggle(state, "homeSoundToggle", "sound");
+  bindSettingToggle(state, "vibrationToggle", "vibration");
+  bindSettingToggle(state, "homeVibrationToggle", "vibration");
 
   window.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
@@ -361,11 +440,12 @@ export function bindInput(state) {
   window.DarkChessDebug = {
     state,
     restart: () => restart(state),
-    switchMode: (mode) => {
-      if (mode === GAME_MODES.HUMAN || mode === GAME_MODES.AI) {
-        switchMode(state, mode);
+    startGame: (mode) => {
+      if (mode === GAME_MODES.LOCAL || mode === GAME_MODES.HUMAN || mode === GAME_MODES.AI) {
+        startGame(state, mode);
       }
     },
+    returnHome: () => returnHome(state, { skipConfirm: true }),
     forceTurn: (camp) => {
       if (camp === CAMPS.RED || camp === CAMPS.BLACK) {
         state.currentCamp = camp;
