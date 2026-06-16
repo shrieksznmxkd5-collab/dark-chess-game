@@ -33,66 +33,60 @@ function buildInviteUrl(code) {
 }
 
 function wrapRoomError(action, error) {
-  const message = sanitizeSupabaseError(error);
+  logSupabaseError(action, error);
+  const message = formatSupabaseError(error);
   if (message.includes("row-level security") || message.includes("permission denied")) {
-    return new Error(`${action}失败：数据库 RLS 拒绝了本次写入，请确认已为好友房创建安全的写入策略或 Edge Function。`);
+    return new Error(`${action}失败：数据库 RLS 拒绝了本次写入。${message}`);
   }
   return new Error(`${action}失败：${message}`);
+}
+
+function formatSupabaseError(error) {
+  const parts = [];
+  if (error?.code) {
+    parts.push(`code=${sanitizeSupabaseError(error.code)}`);
+  }
+  if (error?.message) {
+    parts.push(`message=${sanitizeSupabaseError(error.message)}`);
+  }
+  if (error?.details) {
+    parts.push(`details=${sanitizeSupabaseError(error.details)}`);
+  }
+  if (error?.hint) {
+    parts.push(`hint=${sanitizeSupabaseError(error.hint)}`);
+  }
+  return parts.join("; ") || sanitizeSupabaseError(error);
+}
+
+function logSupabaseError(action, error) {
+  console.error(`[Supabase] ${action}失败`, {
+    code: error?.code ?? null,
+    message: sanitizeSupabaseError(error?.message),
+    details: sanitizeSupabaseError(error?.details),
+    hint: sanitizeSupabaseError(error?.hint)
+  });
 }
 
 export async function createFriendRoom(nickname) {
   const displayName = assertNickname(nickname);
   const { supabase, user } = await ensureAnonymousSession();
 
-  let lastError = null;
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    const code = createRoomCode();
-    const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 6).toISOString();
-
-    const roomResult = await supabase
-      .from("rooms")
-      .insert({
-        code,
-        status: "waiting",
-        host_user_id: user.id,
-        red_user_id: user.id,
-        current_turn: null,
-        expires_at: expiresAt
-      })
-      .select("id, code, status, host_user_id, red_user_id, black_user_id, version, created_at")
-      .single();
-
-    if (roomResult.error) {
-      lastError = roomResult.error;
-      if (roomResult.error.code === "23505") {
-        continue;
-      }
-      throw wrapRoomError("创建房间", roomResult.error);
-    }
-
-    const memberResult = await supabase
-      .from("room_members")
-      .insert({
-        room_id: roomResult.data.id,
-        user_id: user.id,
-        display_name: displayName,
-        camp: "red",
-        is_host: true,
-        ready: false,
-        connected: true,
-        last_seen_at: new Date().toISOString()
-      })
-      .select("id")
-      .single();
-
-    if (memberResult.error) {
-      throw wrapRoomError("创建房间成员", memberResult.error);
-    }
-
-    return loadRoomBundle(roomResult.data.id);
+  if (!user?.id) {
+    throw new Error("匿名登录未返回用户 ID，已停止创建房间。");
   }
 
-  throw wrapRoomError("创建房间", lastError ?? new Error("房间码生成冲突，请重试。"));
+  const roomResult = await supabase
+    .rpc("create_friend_room", {
+      p_display_name: displayName,
+      p_room_code: null
+    })
+    .single();
+
+  if (roomResult.error) {
+    throw wrapRoomError("创建好友房 RPC", roomResult.error);
+  }
+
+  return loadRoomBundle(roomResult.data.id);
 }
 
 export async function joinFriendRoom(roomCode, nickname) {
@@ -103,79 +97,22 @@ export async function joinFriendRoom(roomCode, nickname) {
   }
 
   const { supabase, user } = await ensureAnonymousSession();
+  if (!user?.id) {
+    throw new Error("匿名登录未返回用户 ID，已停止加入房间。");
+  }
+
   const roomResult = await supabase
-    .from("rooms")
-    .select("id, code, status, host_user_id, red_user_id, black_user_id, version, created_at")
-    .eq("code", code)
-    .maybeSingle();
-
-  if (roomResult.error) {
-    throw wrapRoomError("查询房间", roomResult.error);
-  }
-
-  const room = roomResult.data;
-  if (!room) {
-    throw new Error("未找到该房间，或当前 RLS 策略不允许非成员通过房间码查询。");
-  }
-  if (room.status !== "waiting") {
-    throw new Error("该房间已经开始或已关闭，无法加入。");
-  }
-
-  const existingMember = await supabase
-    .from("room_members")
-    .select("id, camp")
-    .eq("room_id", room.id)
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (existingMember.error) {
-    throw wrapRoomError("查询成员", existingMember.error);
-  }
-
-  if (existingMember.data) {
-    return loadRoomBundle(room.id);
-  }
-
-  if (room.black_user_id && room.black_user_id !== user.id) {
-    throw new Error("该房间黑方位置已满。");
-  }
-
-  const updateResult = await supabase
-    .from("rooms")
-    .update({ black_user_id: user.id })
-    .eq("id", room.id)
-    .is("black_user_id", null)
-    .select("id")
-    .maybeSingle();
-
-  if (updateResult.error) {
-    throw wrapRoomError("加入房间", updateResult.error);
-  }
-
-  if (!updateResult.data && room.black_user_id !== user.id) {
-    throw new Error("该房间刚刚被其他玩家加入。");
-  }
-
-  const memberResult = await supabase
-    .from("room_members")
-    .insert({
-      room_id: room.id,
-      user_id: user.id,
-      display_name: displayName,
-      camp: "black",
-      is_host: false,
-      ready: false,
-      connected: true,
-      last_seen_at: new Date().toISOString()
+    .rpc("join_friend_room", {
+      p_room_code: code,
+      p_display_name: displayName
     })
-    .select("id")
     .single();
 
-  if (memberResult.error) {
-    throw wrapRoomError("加入房间成员", memberResult.error);
+  if (roomResult.error) {
+    throw wrapRoomError("加入好友房 RPC", roomResult.error);
   }
 
-  return loadRoomBundle(room.id);
+  return loadRoomBundle(roomResult.data.id);
 }
 
 export async function loadRoomBundle(roomId) {
