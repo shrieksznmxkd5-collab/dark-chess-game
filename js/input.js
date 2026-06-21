@@ -262,6 +262,11 @@ function queueAiMove(state) {
 }
 
 function handleBoardClick(state, event) {
+  if (state.mode === GAME_MODES.ONLINE) {
+    showToast("在线棋盘已同步，走棋将在下一步开放。");
+    return;
+  }
+
   if (state.inputLocked || state.gameOver) {
     return;
   }
@@ -344,6 +349,12 @@ export function returnHome(state, { skipConfirm = false } = {}) {
 
   if (shouldConfirm && !window.confirm("当前棋局尚未结束，确认返回首页吗？")) {
     return false;
+  }
+
+  if (state.mode === GAME_MODES.ONLINE) {
+    import("./network/online-game-controller.js").then((module) => {
+      module.leaveOnlineGame();
+    });
   }
 
   stopAiTask(state);

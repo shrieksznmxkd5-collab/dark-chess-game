@@ -32,7 +32,7 @@ function bindHomeActions(state) {
   document.getElementById("homeJoinRoomBtn")?.addEventListener("click", async () => {
     try {
       const lobby = await loadOnlineLobby();
-      lobby.openJoinRoomFlow();
+      lobby.openJoinRoomFlow("", state);
     } catch (error) {
       showToast(`在线房间模块加载失败：${error.message}`);
     }
@@ -49,7 +49,7 @@ async function openRoomFromUrl(state) {
 
   try {
     const lobby = await loadOnlineLobby();
-    lobby.openJoinRoomFlow(roomCode);
+    lobby.openRoomFromUrl(roomCode, state);
   } catch (error) {
     showToast(`邀请链接处理失败：${error.message}`);
   }

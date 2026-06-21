@@ -119,7 +119,7 @@ export async function loadRoomBundle(roomId) {
   const { supabase, user } = await ensureAnonymousSession();
   const roomResult = await supabase
     .from("rooms")
-    .select("id, code, status, host_user_id, red_user_id, black_user_id, version, created_at")
+    .select("id, code, status, host_user_id, red_user_id, black_user_id, current_turn, version, created_at")
     .eq("id", roomId)
     .single();
 
@@ -143,6 +143,26 @@ export async function loadRoomBundle(roomId) {
     currentUserId: user.id,
     inviteUrl: buildInviteUrl(roomResult.data.code)
   };
+}
+
+export async function loadRoomBundleByCode(roomCode) {
+  const code = normalizeRoomCode(roomCode);
+  if (code.length !== ROOM_CODE_LENGTH) {
+    throw new Error("请输入 6 位房间码。");
+  }
+
+  const { supabase } = await ensureAnonymousSession();
+  const roomResult = await supabase
+    .from("rooms")
+    .select("id")
+    .eq("code", code)
+    .single();
+
+  if (roomResult.error) {
+    throw wrapRoomError("读取邀请房间", roomResult.error);
+  }
+
+  return loadRoomBundle(roomResult.data.id);
 }
 
 export async function setReady(roomId, ready) {

@@ -48,7 +48,8 @@ export const PIECE_LABELS = {
 export const GAME_MODES = {
   LOCAL: "local",
   HUMAN: "local",
-  AI: "ai"
+  AI: "ai",
+  ONLINE: "online"
 };
 
 export const APP_VIEWS = {

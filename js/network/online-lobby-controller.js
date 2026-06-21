@@ -4,15 +4,19 @@ import {
   createFriendRoom,
   joinFriendRoom,
   loadRoomBundle,
+  loadRoomBundleByCode,
   normalizeRoomCode,
   setReady,
   subscribeRoom
 } from "./room-service.js";
+import { startOnlineGame } from "./online-game-service.js";
 import { showToast } from "../renderer.js";
 
 let currentBundle = null;
 let unsubscribeLobby = null;
 let refreshTimer = null;
+let appState = null;
+const startingRooms = new Set();
 
 function getElement(id) {
   return document.getElementById(id);
@@ -195,6 +199,12 @@ function getCurrentMember() {
   return currentBundle?.members.find((member) => member.user_id === currentBundle.currentUserId) ?? null;
 }
 
+function isBothReady(bundle) {
+  const red = bundle?.members.find((member) => member.camp === "red");
+  const black = bundle?.members.find((member) => member.camp === "black");
+  return Boolean(red?.ready && black?.ready);
+}
+
 function renderLobby(bundle) {
   ensureOnlineDialogs();
   currentBundle = bundle;
@@ -215,7 +225,7 @@ function renderLobby(bundle) {
   readyButton.textContent = currentMember?.ready ? "取消准备" : "准备";
 
   getElement("onlineLobbyStatus").textContent = bothReady
-    ? "双方已准备。在线走棋将在下一阶段开放。"
+    ? "双方已准备，正在初始化在线棋局。"
     : black
       ? "等待双方准备。"
       : "房主为红方，等待黑方玩家加入。";
@@ -223,6 +233,69 @@ function renderLobby(bundle) {
   const dialog = getElement("onlineLobbyDialog");
   if (!dialog.open) {
     dialog.showModal();
+  }
+}
+
+function stopLobbySubscription() {
+  if (unsubscribeLobby) {
+    unsubscribeLobby();
+    unsubscribeLobby = null;
+  }
+  window.clearTimeout(refreshTimer);
+  refreshTimer = null;
+}
+
+async function enterOnlineGameFromLobby(bundle, startResult = null) {
+  if (!appState) {
+    return;
+  }
+
+  stopLobbySubscription();
+  const dialog = getElement("onlineLobbyDialog");
+  if (dialog?.open) {
+    dialog.close();
+  }
+
+  const game = await import("./online-game-controller.js");
+  const snapshotRecord = startResult?.snapshot
+    ? {
+        room_id: bundle.room.id,
+        snapshot: startResult.snapshot,
+        version: startResult.version,
+        current_turn: startResult.currentTurn
+      }
+    : null;
+
+  await game.enterOnlineGame(appState, bundle, snapshotRecord);
+}
+
+async function progressLobbyIfReady(bundle) {
+  if (!appState || !bundle?.room?.id) {
+    return;
+  }
+
+  if (bundle.room.status === "playing") {
+    await enterOnlineGameFromLobby(bundle);
+    return;
+  }
+
+  if (bundle.room.status !== "waiting" || !isBothReady(bundle)) {
+    return;
+  }
+
+  if (startingRooms.has(bundle.room.id)) {
+    return;
+  }
+
+  startingRooms.add(bundle.room.id);
+  try {
+    const startResult = await startOnlineGame(bundle.room.id);
+    const latestBundle = await loadRoomBundle(bundle.room.id);
+    await enterOnlineGameFromLobby(latestBundle, startResult);
+  } catch (error) {
+    showToast(error.message);
+  } finally {
+    startingRooms.delete(bundle.room.id);
   }
 }
 
@@ -247,6 +320,7 @@ async function startLobbySubscription(roomId) {
 async function showLobby(bundle) {
   renderLobby(bundle);
   await startLobbySubscription(bundle.room.id);
+  await progressLobbyIfReady(bundle);
 }
 
 async function refreshLobby() {
@@ -255,7 +329,9 @@ async function refreshLobby() {
   }
 
   try {
-    renderLobby(await loadRoomBundle(currentBundle.room.id));
+    const bundle = await loadRoomBundle(currentBundle.room.id);
+    renderLobby(bundle);
+    await progressLobbyIfReady(bundle);
   } catch (error) {
     showToast(error.message);
   }
@@ -270,7 +346,9 @@ async function toggleReady() {
   const button = getElement("onlineReadyBtn");
   button.disabled = true;
   try {
-    renderLobby(await setReady(currentBundle.room.id, !currentMember.ready));
+    const bundle = await setReady(currentBundle.room.id, !currentMember.ready);
+    renderLobby(bundle);
+    await progressLobbyIfReady(bundle);
   } catch (error) {
     showToast(error.message);
     button.disabled = false;
@@ -278,12 +356,7 @@ async function toggleReady() {
 }
 
 export function closeLobby() {
-  if (unsubscribeLobby) {
-    unsubscribeLobby();
-    unsubscribeLobby = null;
-  }
-  window.clearTimeout(refreshTimer);
-  refreshTimer = null;
+  stopLobbySubscription();
   currentBundle = null;
   const dialog = getElement("onlineLobbyDialog");
   if (dialog?.open) {
@@ -291,7 +364,8 @@ export function closeLobby() {
   }
 }
 
-export async function openCreateRoomFlow() {
+export async function openCreateRoomFlow(state = null) {
+  appState = state ?? appState;
   const entry = await requestOnlineEntry({ mode: "create" });
   if (!entry) {
     return;
@@ -310,7 +384,14 @@ export async function openCreateRoomFlow() {
   }
 }
 
-export async function openJoinRoomFlow(roomCode = "") {
+export async function openJoinRoomFlow(roomCode = "", state = null) {
+  if (typeof roomCode === "object" && roomCode !== null) {
+    appState = roomCode;
+    roomCode = "";
+  } else {
+    appState = state ?? appState;
+  }
+
   const entry = await requestOnlineEntry({ mode: "join", roomCode });
   if (!entry) {
     return;
@@ -326,5 +407,15 @@ export async function openJoinRoomFlow(roomCode = "") {
   } catch (error) {
     window.alert(error.message);
     showToast(error.message);
+  }
+}
+
+export async function openRoomFromUrl(roomCode, state = null) {
+  appState = state ?? appState;
+  try {
+    const bundle = await loadRoomBundleByCode(roomCode);
+    await showLobby(bundle);
+  } catch {
+    await openJoinRoomFlow(roomCode, state);
   }
 }

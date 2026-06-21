@@ -226,6 +226,15 @@ function renderCapturedList(state, camp) {
 }
 
 function getSpecialText(state) {
+  if (state.mode === GAME_MODES.ONLINE && state.onlineRoom) {
+    return `
+      <strong>在线对局 · 房间 ${state.onlineRoom.code}</strong><br>
+      红方：${state.onlineRoom.redName}　黑方：${state.onlineRoom.blackName}<br>
+      你是${state.onlineRoom.userCampName}，当前${CAMP_NAMES[state.currentCamp]}行动。<br>
+      本阶段已同步棋盘，在线走棋将在下一步开放。
+    `;
+  }
+
   const phase = getLogicPhase(state);
   const delayed = state.delayedThreat;
 
@@ -279,7 +288,12 @@ function renderStatus(state) {
   const modeText = getElement("modeText");
   const stateText = getElement("stateText");
   if (modeText) {
-    modeText.textContent = state.mode === GAME_MODES.AI ? "人机模式" : "双人模式";
+    modeText.textContent =
+      state.mode === GAME_MODES.ONLINE
+        ? "在线对局"
+        : state.mode === GAME_MODES.AI
+          ? "人机模式"
+          : "双人模式";
   }
   if (stateText) {
     stateText.textContent = getStateLabel(state);
@@ -289,6 +303,16 @@ function renderStatus(state) {
 
 function renderSelectionInfo(state) {
   const element = getElement("selectionInfo");
+
+  if (state.mode === GAME_MODES.ONLINE && state.onlineRoom) {
+    element.innerHTML = `
+      <strong>当前玩家阵营：</strong>你是${state.onlineRoom.userCampName}<br>
+      <strong>房间码：</strong>${state.onlineRoom.code}<br>
+      在线棋盘已同步；本阶段暂不开放实际走棋。
+    `;
+    return;
+  }
+
   const piece = state.pieces.find((item) => item.id === state.selectedPieceId && item.alive);
 
   if (!piece) {
@@ -356,16 +380,34 @@ function canUseAiUndo(state) {
 function renderUndoControls(state) {
   const remaining = Math.max(0, state.undoRemaining ?? 0);
   const enabled = canUseAiUndo(state);
-  const label = state.mode === GAME_MODES.AI ? `悔棋（${remaining}）` : "悔棋";
+  const label =
+    state.mode === GAME_MODES.ONLINE
+      ? "在线对局"
+      : state.mode === GAME_MODES.AI
+        ? `悔棋（${remaining}）`
+        : "悔棋";
   const buttons = [getElement("undoBtn"), getElement("victoryUndoBtn")].filter(Boolean);
 
   buttons.forEach((button) => {
     button.textContent = label;
     button.disabled = !enabled;
     button.title =
-      state.mode === GAME_MODES.AI
+      state.mode === GAME_MODES.ONLINE
+        ? "在线对局暂不开放悔棋。"
+        : state.mode === GAME_MODES.AI
         ? "人机模式下，可在 AI 落子后撤回上一轮行动。"
         : "悔棋仅在人机模式中开放。";
+  });
+}
+
+function renderModeControls(state) {
+  const isOnline = state.mode === GAME_MODES.ONLINE;
+  const restartButton = getElement("restartBtn");
+  const victoryRestartButton = getElement("victoryRestartBtn");
+
+  [restartButton, victoryRestartButton].filter(Boolean).forEach((button) => {
+    button.disabled = isOnline;
+    button.title = isOnline ? "在线对局暂不支持本地重新开局。" : "";
   });
 }
 
@@ -412,6 +454,7 @@ export function renderGame(state) {
   renderSelectionInfo(state);
   renderVictory(state);
   renderUndoControls(state);
+  renderModeControls(state);
 }
 
 let toastTimer = null;
